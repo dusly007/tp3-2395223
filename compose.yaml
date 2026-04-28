@@ -1,0 +1,110 @@
+services:
+  #REVERSE PROXY : TRAEFIK (HTTPS) 
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    restart: unless-stopped
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # Redirection forcée de HTTP vers HTTPS
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--certificatesresolvers.myresolver.acme.dnschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=duckdns"
+      - "--certificatesresolvers.myresolver.acme.email=${MY_EMAIL}"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    environment:
+      - DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "traefik_certs:/letsencrypt"
+    networks:
+      - tp3-network
+
+  # SERVICE:
+  # PORTAINER
+  portainer:
+    image: portainer/portainer-ce:alpine
+    container_name: portainer
+    restart: unless-stopped
+    networks:
+      - tp3-network
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "portainer_data:/data"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portainer.rule=Host(`portainer.${MY_DOMAIN}`)"
+      - "traefik.http.routers.portainer.entryPoints=websecure"
+      - "traefik.http.routers.portainer.tls.certresolver=myresolver"
+      - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+
+  # NEXTCLOUD 
+  nextcloud-db:
+    image: mariadb:10.11
+    container_name: nextcloud-db
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${NC_DB_PASSWORD}
+      - MYSQL_PASSWORD=${NC_DB_PASSWORD}
+      - MYSQL_DATABASE=${NC_DB_NAME}
+      - MYSQL_USER=${NC_DB_USER}
+    volumes:
+      - "nextcloud_db:/var/lib/mysql"
+    networks:
+      - tp3-network
+
+  nextcloud:
+    image: nextcloud:latest
+    container_name: nextcloud
+    restart: unless-stopped
+    depends_on:
+      - nextcloud-db
+    environment:
+      - MYSQL_PASSWORD=${NC_DB_PASSWORD}
+      - MYSQL_DATABASE=${NC_DB_NAME}
+      - MYSQL_USER=${NC_DB_USER}
+      - MYSQL_HOST=nextcloud-db
+    networks:
+      - tp3-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.nextcloud.rule=Host(`nextcloud.${MY_DOMAIN}`)"
+      - "traefik.http.routers.nextcloud.entryPoints=websecure"
+      - "traefik.http.routers.nextcloud.tls.certresolver=myresolver"
+
+  # PLEX 
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - VERSION=docker
+      - PLEX_CLAIM=${PLEX_CLAIM}
+    volumes:
+      - "plex_config:/config"
+    networks:
+      - tp3-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.plex.rule=Host(`plex.${MY_DOMAIN}`)"
+      - "traefik.http.routers.plex.entryPoints=websecure"
+      - "traefik.http.routers.plex.tls.certresolver=myresolver"
+      - "traefik.http.services.plex.loadbalancer.server.port=32400"
+
+networks:
+  tp3-network:
+    driver: bridge
+
+volumes:
+  traefik_certs:
+  portainer_data:
+  nextcloud_db:
+  plex_config:
