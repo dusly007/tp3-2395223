@@ -1,7 +1,7 @@
 services:
   # REVERSE PROXY : TRAEFIK (HTTPS) 
   traefik:
-    image: traefik:v2.10
+    image: traefik:v2.11
     container_name: traefik
     restart: unless-stopped
     command:
@@ -9,6 +9,7 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
+      # Redirection forcée de HTTP vers HTTPS
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--certificatesresolvers.myresolver.acme.dnschallenge=true"
       - "--certificatesresolvers.myresolver.acme.dnschallenge.provider=duckdns"
@@ -16,7 +17,6 @@ services:
       - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
     environment:
       - DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
-      - DOCKER_API_VERSION=1.40
     ports:
       - "80:80"
       - "443:443"
@@ -38,7 +38,7 @@ services:
       - "portainer_data:/data"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.portainer.rule=Host('portainer.${MY_DOMAIN}')"
+      - "traefik.http.routers.portainer.rule=Host(`portainer.${MY_DOMAIN}`)"
       - "traefik.http.routers.portainer.entryPoints=websecure"
       - "traefik.http.routers.portainer.tls.certresolver=myresolver"
       - "traefik.http.services.portainer.loadbalancer.server.port=9000"
@@ -73,7 +73,7 @@ services:
       - tp3-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.nextcloud.rule=Host('nextcloud.${MY_DOMAIN}')"
+      - "traefik.http.routers.nextcloud.rule=Host(`nextcloud.${MY_DOMAIN}`)"
       - "traefik.http.routers.nextcloud.entryPoints=websecure"
       - "traefik.http.routers.nextcloud.tls.certresolver=myresolver"
 
@@ -93,7 +93,7 @@ services:
       - tp3-network
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.plex.rule=Host('plex.${MY_DOMAIN}')"
+      - "traefik.http.routers.plex.rule=Host(`plex.${MY_DOMAIN}`)"
       - "traefik.http.routers.plex.entryPoints=websecure"
       - "traefik.http.routers.plex.tls.certresolver=myresolver"
       - "traefik.http.services.plex.loadbalancer.server.port=32400"
